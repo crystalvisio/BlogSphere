@@ -8,21 +8,17 @@ from flask_bootstrap import Bootstrap5
 from sqlalchemy.orm import relationship
 from flask_sqlalchemy import SQLAlchemy
 from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm
-from flask import Flask, abort, render_template, redirect, url_for, flash, request
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask, abort, render_template, redirect, url_for, flash, request
 from flask_login import UserMixin, login_user, LoginManager, current_user, logout_user, login_required
 
 load_dotenv()
-
-DB_PATH = "C:/Users/dunsi/Code Vault/Python Env/Flask-Auth/Day 69 Blog with Users/instance/"
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 ckeditor = CKEditor(app)
 Bootstrap5(app)
 
-
-# TODO: Configure Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 
@@ -30,46 +26,22 @@ login_manager.init_app(app)
 def user_loader(user_id):
     return db.session.get(User, user_id)
 
-
-gravatar = Gravatar(app,
-                    size=100,
-                    rating='g',
-                    default='retro',
-                    force_default=False,
-                    force_lower=False,
-                    use_ssl=False,
-                    base_url=None)
-
+gravatar = Gravatar(
+    app,
+    size=100,
+    rating='g',
+    default='retro',
+    force_default=False,
+    force_lower=False,
+    use_ssl=False,
+    base_url=None
+)
 
 # CONNECT TO DB
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}posts.db"
-
-"""
-To Bind two databases together
----- configure the default databse then use the code below to bind it... 'POSTS' can be anything (it's use bind_key)
-app.config["SQLALCHEMY_BINDS"] = {
-    "POSTS": f"sqlite:///{DB_PATH}posts.db"
-}
-
-then laster you go to the class for the databse and write 
-__bind_key__ = 'your bind key'
-"""
-
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DB_URI", "sqlite:////instance/posts.db")
 
 db = SQLAlchemy()
 db.init_app(app)
-
-# CONFIGURE USER TABLE
-class User(UserMixin, db.Model):
-    id = db.Column(db.Integer, primary_key = True)
-    name = db.Column(db.String(100), nullable = False)
-    email = db.Column(db.String(100), unique = True, nullable = False)
-    password = db.Column(db.String(100), nullable = False)
-
-    # User can have many posts and also many comments 
-    posts = db.relationship("BlogPost", back_populates = "author")
-    comments = relationship("Comment", back_populates = "comment_author")
-
 
 
 # CONFIGURE BLOGPOST TABLES
@@ -91,6 +63,19 @@ class BlogPost(db.Model):
     date = db.Column(db.String(250), nullable=False)
     body = db.Column(db.Text, nullable=False)
     img_url = db.Column(db.String(250), nullable=False)
+
+
+# CONFIGURE USER TABLE
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key = True)
+    name = db.Column(db.String(100), nullable = False)
+    email = db.Column(db.String(100), unique = True, nullable = False)
+    password = db.Column(db.String(100), nullable = False)
+
+    # User can have many posts and also many comments 
+    posts = db.relationship("BlogPost", back_populates = "author")
+    comments = relationship("Comment", back_populates = "comment_author")
+
 
 # CONFIGURE COMMENT TABLE
 class Comment(db.Model):
@@ -119,15 +104,7 @@ def admin_only(function):
         return function(*args, **kwargs)
     return wrapper
 
-"""
-def admin_only(function):
-    @wraps(function)
-    def wrapper(*args, **kwargs):
-        if current_user.id != 1:
-            abort(403)
-        return function(*args, **kwargs)
-    return wrapper
-"""
+
 @app.route("/")
 def home():
     posts = db.session.execute(db.select(BlogPost)).scalars().all()
@@ -279,4 +256,4 @@ def contact():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5002)
+    app.run(debug=False)
