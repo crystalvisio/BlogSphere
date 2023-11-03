@@ -1,4 +1,6 @@
 import os
+import hashlib
+import binascii
 from datetime import date
 from functools import wraps
 from dotenv import load_dotenv
@@ -123,10 +125,15 @@ def register():
             return redirect(url_for("login"))
         
         else:
+            password = request.form.get("password")
+            salt = os.urandom(16)  # Generate a random salt
+            dk = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+            hashed_password = binascii.hexlify(dk).decode()  # Get the hashed password
+
             new_user = User(
                 name = request.form.get("name"),
                 email = email,
-                password = generate_password_hash(request.form.get("password"), method = "pbkdf2", salt_length = 20)
+                password = hashed_password
             )
             db.session.add(new_user)
             db.session.commit()
@@ -138,6 +145,32 @@ def register():
     return render_template("register.html", form = register_form, current_user = current_user)
 
 
+# def register():
+#     register_form = RegisterForm()
+#     if request.method == "POST":
+#         email = request.form.get("email")
+#         user = db.session.execute(db.select(User).where(User.email == email)).scalar()
+
+#         if user:
+#             flash("You've already signed up with this E-mail! Log in Instead")
+#             return redirect(url_for("login"))
+        
+#         else:
+#             new_user = User(
+#                 name = request.form.get("name"),
+#                 email = email,
+#                 password = generate_password_hash(request.form.get("password"), method = "pbkdf2", salt_length = 20)
+#             )
+#             db.session.add(new_user)
+#             db.session.commit()
+
+#             # This line will authenticate the user with Flask-Login
+#             login_user(new_user)
+#             return redirect(url_for("home"))
+
+#     return render_template("register.html", form = register_form, current_user = current_user)
+
+
 # TODO: Retrieve a user from the database based on their email. 
 @app.route("/login", methods = ["GET", "POST"])
 def login():
@@ -147,7 +180,16 @@ def login():
         password = request.form.get("password")
 
         user = db.session.execute(db.select(User).where(User.email == email)).scalar()
-        valid_password = check_password_hash(user.password, password)
+
+        # Retrieve the salt from the user record
+        salt = user.salt
+
+        # Hash the provided password with the stored salt
+        dk = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+        hashed_password = binascii.hexlify(dk).decode()
+
+        # Check if the hashed password matches the stored password
+        valid_password = hashed_password == user.password
 
         if not user or not valid_password:
             flash("❗ Invalid Email or Password Entered.")
@@ -158,6 +200,26 @@ def login():
             return redirect(url_for("home"))
             
     return render_template("login.html", form = login_form, current_user = current_user)
+
+# @app.route("/login", methods = ["GET", "POST"])
+# def login():
+#     login_form = LoginForm()
+#     if request.method == "POST":
+#         email = request.form.get("email")
+#         password = request.form.get("password")
+
+#         user = db.session.execute(db.select(User).where(User.email == email)).scalar()
+#         valid_password = check_password_hash(user.password, password)
+
+#         if not user or not valid_password:
+#             flash("❗ Invalid Email or Password Entered.")
+#             return redirect(url_for("login"))
+        
+#         else:
+#             login_user(user)
+#             return redirect(url_for("home"))
+            
+#     return render_template("login.html", form = login_form, current_user = current_user)
 
 
 @app.route("/logout")
