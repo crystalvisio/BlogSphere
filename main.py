@@ -1,7 +1,5 @@
 # Import Necessary Modules
 import os
-import hashlib
-import binascii
 from datetime import date
 from functools import wraps
 from dotenv import load_dotenv
