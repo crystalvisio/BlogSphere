@@ -1,3 +1,4 @@
+# Import Necessary Modules
 import os
 import hashlib
 import binascii
@@ -14,20 +15,27 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Flask, abort, render_template, redirect, url_for, flash, request
 from flask_login import UserMixin, login_user, LoginManager, current_user, logout_user, login_required
 
+# Load Enviroment varibales from .env file
 load_dotenv()
 
+# Create Flask App instance
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+
+# Initialise CKEditor and Bootstrap
 ckeditor = CKEditor(app)
 Bootstrap5(app)
 
+# Initialise Flask Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 
+# Def user_loader callback for Flask-Login
 @login_manager.user_loader
 def user_loader(user_id):
     return db.session.get(User, user_id)
 
+# Initialise gravitar for flask
 gravatar = Gravatar(
     app,
     size=100,
@@ -39,27 +47,19 @@ gravatar = Gravatar(
     base_url=None
 )
 
-# CONNECT TO DB
+# Connect to database
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DB_URI", "sqlite:////instance/posts.db")
-
 db = SQLAlchemy()
 db.init_app(app)
 
 
-# CONFIGURE BLOGPOST TABLES
+# Define BlogPost Model
 class BlogPost(db.Model):
     __tablename__ = "blog_posts"
     id = db.Column(db.Integer, primary_key=True)
-    
-    # ForeignKey to link Users(refer to primary key of the user, one user can have multiple post[One to many relationship])
-    author_id = db.Column(db.Integer, db.ForeignKey("user.id"))
-
-    #Create reference to the User object, the "posts" refers to the posts property in the User class.  
-    author = relationship("User", back_populates = "posts")
-
-    # Create reference to the Comment object
-    comments = relationship("Comment", back_populates="parent_post")
-
+    author_id = db.Column(db.Integer, db.ForeignKey("user.id")) # Links to User via primary key
+    author = relationship("User", back_populates = "posts") # References User object, the "posts" refers to the posts property in the User class.  
+    comments = relationship("Comment", back_populates="parent_post") # Reference Comment object
     title = db.Column(db.String(250), unique=True, nullable=False)
     subtitle = db.Column(db.String(250), nullable=False)
     date = db.Column(db.String(250), nullable=False)
@@ -67,7 +67,7 @@ class BlogPost(db.Model):
     img_url = db.Column(db.String(250), nullable=False)
 
 
-# CONFIGURE USER TABLE
+# Define User Model
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key = True)
     name = db.Column(db.String(100), nullable = False)
@@ -79,7 +79,7 @@ class User(UserMixin, db.Model):
     comments = relationship("Comment", back_populates = "comment_author")
 
 
-# CONFIGURE COMMENT TABLE
+# Define Comment Model
 class Comment(db.Model):
     __tablename__ = "comments"
     id = db.Column(db.Integer, primary_key = True)
@@ -92,6 +92,7 @@ class Comment(db.Model):
     parent_post = relationship("BlogPost", back_populates="comments")
 
 
+# Create all table in database
 with app.app_context():
     db.create_all()
 
@@ -107,12 +108,14 @@ def admin_only(function):
     return wrapper
 
 
+# Define route for the homePage
 @app.route("/")
 def home():
     posts = db.session.execute(db.select(BlogPost)).scalars().all()
     return render_template("index.html", all_posts=posts, current_user = current_user)
 
 
+# Define the route for the registerPage
 @app.route("/register", methods  = ["GET", "POST"])
 def register():
     register_form = RegisterForm()
@@ -171,6 +174,7 @@ def register():
 #     return render_template("register.html", form = register_form, current_user = current_user)
 
 
+# Define route or the loginPage
 # TODO: Retrieve a user from the database based on their email. 
 @app.route("/login", methods = ["GET", "POST"])
 def login():
@@ -222,12 +226,14 @@ def login():
 #     return render_template("login.html", form = login_form, current_user = current_user)
 
 
+# Define route to logoutPage
 @app.route("/logout")
 def logout():
     logout_user()
     return redirect(url_for("home"))
 
 
+# Define route to displayPost
 # TODO: Allow logged-in users to comment on posts
 @app.route("/post/<int:post_id>", methods = ["GET", "POST"])
 def show_post(post_id):
@@ -251,6 +257,7 @@ def show_post(post_id):
     return render_template("post.html", form = comment_form, post=requested_post, current_user = current_user)
 
 
+# Define route to addPost
 # TODO: Use a decorator so only an admin user can create a new post
 @app.route("/new-post", methods=["GET", "POST"])
 @login_required
@@ -272,6 +279,7 @@ def add_new_post():
     return render_template("make-post.html", form=create_form, current_user = current_user)
 
 
+# Define route to editPost
 # TODO: Use a decorator so only an admin user can edit a post
 @app.route("/edit-post/<int:post_id>", methods=["GET", "POST"])
 @login_required
@@ -296,6 +304,7 @@ def edit_post(post_id):
     return render_template("make-post.html", form=edit_form, is_edit=True, current_user = current_user)
 
 
+# Define route to deletePost
 # TODO: Use a decorator so only an admin user can delete a post
 @app.route("/delete/<int:post_id>")
 @login_required
@@ -307,15 +316,13 @@ def delete_post(post_id):
     return redirect(url_for("home"))
 
 
+# Define route to aboutPage
 @app.route("/about")
 def about():
     return render_template("about.html", current_user=current_user)
 
 
+# Define route to contactPage
 @app.route("/contact")
 def contact():
     return render_template("contact.html", current_user=current_user)
-
-
-if __name__ == "__main__":
-    app.run(debug=True)
